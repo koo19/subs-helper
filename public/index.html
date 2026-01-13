@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Subs Helper 管理</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
+    <style>
+        body { background-color: #f8f9fa; padding-top: 50px; padding-bottom: 50px; }
+        .container { max-width: 900px; }
+        .config-card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; position: relative; }
+        .login-card { max-width: 500px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .delete-btn { position: absolute; top: 15px; right: 15px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2 class="mb-4 text-center">Subs Helper 配置中心</h2>
+        
+        <div id="login-section" class="login-card">
+            <div class="mb-3">
+                <label for="admin-key" class="form-label">管理密钥 (ADMIN_KEY)</label>
+                <input type="password" class="form-control" id="admin-key" placeholder="输入 .env 中的 ADMIN_KEY">
+            </div>
+            <button onclick="login()" class="btn btn-primary w-100">登录</button>
+        </div>
+
+        <div id="config-section" style="display: none;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5>配置列表</h5>
+                <div>
+                    <button onclick="addConfigItem()" class="btn btn-primary"><i class="bi bi-plus-lg"></i> 添加配置</button>
+                    <button onclick="saveConfig()" class="btn btn-success ms-2"><i class="bi bi-save"></i> 保存全部</button>
+                </div>
+            </div>
+
+            <div id="config-list">
+                <!-- Config items will be injected here -->
+            </div>
+
+            <div class="mt-4">
+                <h5>使用说明</h5>
+                <p>保存配置后，可以使用以下格式访问：</p>
+                <code>https://your-domain.pages.dev/?access_key=YOUR_KEY&path=/path/to/file.js</code>
+            </div>
+        </div>
+    </div>
+
+    <template id="config-template">
+        <div class="config-card">
+            <button class="btn btn-outline-danger btn-sm delete-btn" onclick="removeConfigItem(this)"><i class="bi bi-trash"></i></button>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">访问密钥 (Access Key)</label>
+                    <input type="text" class="form-control access-key" placeholder="例如: client_a">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">备注 (可选)</label>
+                    <input type="text" class="form-control note" placeholder="例如: 公司项目">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">GitHub Owner</label>
+                    <input type="text" class="form-control github-owner" placeholder="例如: octocat">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">GitHub Repo</label>
+                    <input type="text" class="form-control github-repo" placeholder="例如: hello-world">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">GitHub Token</label>
+                    <input type="password" class="form-control github-token" placeholder="ghp_xxxxxxxxxxxx">
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <script>
+        let currentAdminKey = '';
+
+        async function login() {
+            const key = document.getElementById('admin-key').value;
+            try {
+                const res = await fetch('/api/config', {
+                    headers: { 'Authorization': key }
+                });
+                if (res.ok) {
+                    currentAdminKey = key;
+                    document.getElementById('login-section').style.display = 'none';
+                    document.getElementById('config-section').style.display = 'block';
+                    const data = await res.json();
+                    renderConfig(data.config);
+                } else {
+                    alert('管理密钥错误');
+                }
+            } catch (e) {
+                alert('连接失败，请检查网络或后端状态');
+            }
+        }
+
+        function renderConfig(configData) {
+            const list = document.getElementById('config-list');
+            list.innerHTML = '';
+            
+            let items = [];
+            if (Array.isArray(configData)) {
+                items = configData;
+            } else if (configData && typeof configData === 'object' && configData.ACCESS_KEY) {
+                // Handle legacy single object
+                items = [{
+                    accessKey: configData.ACCESS_KEY,
+                    githubToken: configData.GITHUB_TOKEN,
+                    githubOwner: configData.GITHUB_OWNER,
+                    githubRepo: configData.GITHUB_REPO,
+                    note: '旧配置迁移'
+                }];
+            }
+
+            if (items.length === 0) {
+                addConfigItem(); // Add one empty item by default
+            } else {
+                items.forEach(item => addConfigItem(item));
+            }
+        }
+
+        function addConfigItem(data = null) {
+            const template = document.getElementById('config-template');
+            const clone = template.content.cloneNode(true);
+            
+            if (data) {
+                clone.querySelector('.access-key').value = data.accessKey || '';
+                clone.querySelector('.note').value = data.note || '';
+                clone.querySelector('.github-owner').value = data.githubOwner || '';
+                clone.querySelector('.github-repo').value = data.githubRepo || '';
+                clone.querySelector('.github-token').value = data.githubToken || '';
+            }
+
+            document.getElementById('config-list').appendChild(clone);
+        }
+
+        function removeConfigItem(btn) {
+            if (confirm('确定删除此配置吗？')) {
+                btn.closest('.config-card').remove();
+            }
+        }
+
+        async function saveConfig() {
+            const cards = document.querySelectorAll('.config-card');
+            const configList = [];
+            let hasError = false;
+
+            cards.forEach(card => {
+                const item = {
+                    accessKey: card.querySelector('.access-key').value.trim(),
+                    note: card.querySelector('.note').value.trim(),
+                    githubOwner: card.querySelector('.github-owner').value.trim(),
+                    githubRepo: card.querySelector('.github-repo').value.trim(),
+                    githubToken: card.querySelector('.github-token').value.trim()
+                };
+
+                if (!item.accessKey) {
+                    hasError = true;
+                    card.querySelector('.access-key').classList.add('is-invalid');
+                } else {
+                    card.querySelector('.access-key').classList.remove('is-invalid');
+                }
+
+                configList.push(item);
+            });
+
+            if (hasError) {
+                alert('请填写所有必需的 Access Key');
+                return;
+            }
+
+            const res = await fetch('/api/config', {
+                method: 'POST',
+                headers: { 
+                    'Authorization': currentAdminKey,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(configList)
+            });
+
+            if (res.ok) {
+                alert('配置已全部保存');
+            } else {
+                alert('保存失败');
+            }
+        }
+    </script>
+</body>
+</html>

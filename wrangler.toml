@@ -1,0 +1,3 @@
+# Wrangler configuration for Cloudflare Pages
+name = "subs-helper"
+pages_build_output_dir = "public"
