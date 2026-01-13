@@ -24,15 +24,17 @@
 
 ## 部署到 Cloudflare Pages
 
-1. **创建项目**：在 Cloudflare Dashboard 中创建一个新的 Pages 项目。
+1. **创建项目**：在 Cloudflare Dashboard 中创建一个新的 Pages 项目，从 Github 仓库导入本项目。
 2. **设置环境变量**：
    - 在 Settings -> Functions -> Environment variables 中添加 `ADMIN_KEY`。
-3. **设置 KV 绑定**：
+3. **设置构建输出目录**
+   - 在 Settings -> Build configuration -> Build output directory 中配置 /`public`。
+4. **设置 KV 绑定**：
    - 在 Workers & Pages -> KV -> Create Namespace 创建一个名为 `subs-helper-kv` 的命名空间。
    - 在 Pages 项目的 Settings -> Functions -> KV namespace bindings 中，添加一个绑定：
      - Variable name: `SUBS_KV`
      - KV namespace: 选择你刚才创建的命名空间。
-4. **部署代码**：将代码推送到 GitHub 并连接到 Pages，或者使用 `npm run deploy`。
+5. **重新部署项目**
 
 ## 使用方法
 
